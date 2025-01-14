@@ -37,13 +37,16 @@ pub mod solana_blackjack {
         // game.dealer_cards = Vec::new();
         game.bet = 0;
         game.result = None;
+        game.draw_counter = 0;
+
+        game.log_game_state();
 
         Ok(())
     }
 
     pub fn place_bet(ctx: Context<PlaceBet>, bet_amount: u64) -> Result<()> {
-        let game_key = ctx.accounts.game.key();
-        let player_key = ctx.accounts.player.key();
+        let game_key = &ctx.accounts.game.key();
+        let player_key = &ctx.accounts.player.key();
     
         invoke(
             &solana_program::system_instruction::transfer(
@@ -53,17 +56,21 @@ pub mod solana_blackjack {
             ),
             &[ctx.accounts.player.to_account_info(), ctx.accounts.game.to_account_info()],
         )?;
-    
+
+        
         let game = &mut ctx.accounts.game;
         game.bet = bet_amount;
-    
+        msg!("Bet placed, amount: {}", bet_amount);
+
+        game.log_game_state();
+
         Ok(())
     }
     
 
     pub fn hit(ctx: Context<Hit>) -> Result<()> {
         let game = &mut ctx.accounts.game;
-
+        
         if game.bet == 0 {
             return Err(ErrorCode::NoBetPlaced.into());
         }
@@ -72,9 +79,18 @@ pub mod solana_blackjack {
         let clock = Clock::get().unwrap();
         let slot_bytes = clock.slot.to_le_bytes();
 
-        let card = draw_card(&player_key, &slot_bytes, 1);
+        let card = draw_card(&player_key, &slot_bytes, game.draw_counter);
+        game.draw_counter = game.draw_counter.wrapping_add(1);
+        msg!("Draw counter {}",game.draw_counter);
         msg!("Player drew {}", card);
         game.player_cards.push(card);
+        msg!("Player cards are: ");
+        for c in &game.player_cards {
+            msg!("Card: {}", c);
+        }
+        msg!("Player score: {}", calculate_score(&game.player_cards));
+
+        game.log_game_state();
         Ok(())
     }
 
@@ -94,12 +110,11 @@ pub mod solana_blackjack {
         let player_key = ctx.accounts.player.key().to_bytes();
         let blockhash = Clock::get()?.slot.to_le_bytes();
 
-        let mut k = 1; //To not make it output the samething everytime -> Not safe
         while calculate_score(&game.dealer_cards) < 17 {
-            let dealer_card = draw_card(&player_key, &blockhash, k);
+            let dealer_card = draw_card(&player_key, &blockhash, game.draw_counter);
+            game.draw_counter = game.draw_counter.wrapping_add(1);
             game.dealer_cards.push(dealer_card);
             msg!("Dealer drew {}", dealer_card);
-            k += 1;
         }
 
         let dealer_score = calculate_score(&game.dealer_cards);
@@ -117,13 +132,17 @@ pub mod solana_blackjack {
         match game.result {
             Some(GameResult::PlayerWin) => {
                 msg!("Player win");
-                invoke(
+                invoke_signed(
                     &solana_program::system_instruction::transfer(
                         game_account_info.to_account_info().key,
                         &ctx.accounts.player.to_account_info().key,
                         game.bet.mul(2)
                     ),
-                    &[game_account_info.to_account_info(), ctx.accounts.player.to_account_info()]
+                    &[
+                        game_account_info.to_account_info(),
+                        ctx.accounts.player.to_account_info(),
+                    ],
+                    &[&[b"game_pda", ctx.accounts.player.key().as_ref(), &[bump]]],
                 )?;
             }
             Some(GameResult::PlayerBlackjack)=> {
@@ -158,6 +177,7 @@ pub mod solana_blackjack {
                 &[&[b"game_pda", ctx.accounts.player.key().as_ref(), &[bump]]],
             )?;
         }
+        //Implement a way to make those funds not withdrawable by the user, to avoid him just withdrawing what he lost
             Some(GameResult::DealerWin) => {
                 msg!("Dealer win");
                 //Do Nothing
@@ -178,6 +198,8 @@ pub mod solana_blackjack {
         game.bet = 0;
         game.result = None;
 
+        game.log_game_state();
+
         Ok(())
     }
 
@@ -195,6 +217,9 @@ pub mod solana_blackjack {
             ),
             &[ctx.accounts.funder.to_account_info(), ctx.accounts.game.to_account_info()],
         )?;
+
+        ctx.accounts.game.log_game_state();
+
         Ok(())
     }
 
@@ -202,6 +227,9 @@ pub mod solana_blackjack {
         let game = &ctx.accounts.game;
         if ctx.accounts.player.key() != game.player {
             return Err(ErrorCode::Unauthorized.into());
+        }
+        if ctx.accounts.game.result.is_some() {
+            return Err(ErrorCode::GameRunning.into());
         }
     
         invoke_signed(
@@ -216,10 +244,42 @@ pub mod solana_blackjack {
             ],
             &[&[b"game_pda", ctx.accounts.player.key().as_ref(), &[ctx.bumps.game]]],
         )?;
+        game.log_game_state();
+
         Ok(())
     }
+    //This is for debugging, must be removed when final deploy
+
+    pub fn reset_game(ctx: Context<ResetGame>)->Result<()>{
+        
+
+        let pda_balance = **ctx.accounts.game.to_account_info().lamports.borrow();
+        **ctx.accounts.game.to_account_info().lamports.borrow_mut() -= pda_balance;
+        **ctx.accounts.player.to_account_info().lamports.borrow_mut() += pda_balance;
+    
+        // Clear game state
+
+        let game =&mut ctx.accounts.game;
+        game.player = Pubkey::default();
+        game.player_cards.clear();
+        game.dealer_cards.clear();
+        game.bet = 0;
+        game.result = None;
+        game.draw_counter = 0;
+    
+        msg!("Game and player data reset successfully.");
+
+        game.log_game_state();
+
+        Ok(())
+    }
+
+    
+
+    
     
 }
+
 
 impl GameState {
     pub const INITIAL_CARD_CAPACITY: usize = 10;
@@ -231,7 +291,62 @@ impl GameState {
         4 +
         Self::INITIAL_CARD_CAPACITY + //vec<u8> (dealer_cards)
         8 + //u64
-        1; //Option<GameResult>}
+        1 + //Option<GameResult>
+        1; //Draw Counter
+
+
+        pub fn log_game_state(&self) {
+                msg!("Game State on chain:");
+                msg!("- Player: {}", self.player);
+        
+                if self.player_cards.is_empty() {
+                    msg!("- Player Cards: None");
+                } else {
+                    let card_names: Vec<String> = self
+                        .player_cards
+                        .iter()
+                        .map(|&c| match c {
+                            1 => "Ace".to_string(),
+                            11 => "Jack".to_string(),
+                            12 => "Queen".to_string(),
+                            13 => "King".to_string(),
+                            _ => c.to_string(),
+                        })
+                        .collect();
+                    msg!("- Player Cards: {}", card_names.join(", "));
+                }
+        
+                if self.dealer_cards.is_empty() {
+                    msg!("- Dealer Cards: None");
+                } else {
+                    let card_names: Vec<String> = self
+                        .dealer_cards
+                        .iter()
+                        .map(|&c| match c {
+                            1 => "Ace".to_string(),
+                            11 => "Jack".to_string(),
+                            12 => "Queen".to_string(),
+                            13 => "King".to_string(),
+                            _ => c.to_string(),
+                        })
+                        .collect();
+                    msg!("- Dealer Cards: {}", card_names.join(", "));
+                }
+        
+                msg!("- Bet: {} lamports", self.bet);
+                msg!("- Draw Counter: {}", self.draw_counter);
+                match self.result {
+                    None => msg!("- Result: None"),
+                    Some(GameResult::PlayerWin) => msg!("- Result: PlayerWin"),
+                    Some(GameResult::PlayerBlackjack) => msg!("- Result: PlayerBlackjack"),
+                    Some(GameResult::DealerWin) => msg!("- Result: DealerWin"),
+                    Some(GameResult::PlayerBust) => msg!("- Result: PlayerBust"),
+                    Some(GameResult::Push) => msg!("- Result: Push"),
+                }
+            }
+        
+
+
 }
 #[derive(Accounts)]
 pub struct InitializeGame<'info> {
@@ -280,6 +395,7 @@ pub struct GameState {
     pub dealer_cards: Vec<u8>,
     pub bet: u64,
     pub result: Option<GameResult>,
+    pub draw_counter: u8,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Debug)]
@@ -305,6 +421,17 @@ pub struct WithdrawFunds<'info> {
     pub game: Account<'info, GameState>,
     #[account(mut)]
     pub player: Signer<'info>,
+    
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct ResetGame<'info> {
+    #[account(mut, seeds = [b"game_pda", player.key().as_ref()], bump, close = player)]
+    pub game: Account<'info, GameState>,
+    #[account(mut)]
+    pub player: Signer<'info>,
+    #[account(address=anchor_lang::system_program::ID)]
     pub system_program: Program<'info, System>,
 }
 
@@ -340,6 +467,7 @@ fn draw_card(player_key: &[u8], blockhash: &[u8], counter: u8) -> u8 {
 }
 
 
+
 #[error_code]
 pub enum ErrorCode {
     #[msg("A bet must be placed before you can play")]
@@ -352,4 +480,6 @@ pub enum ErrorCode {
     GameAlreadyEnded,
     #[msg("PDA bump seed is missing")]
     MissingBump,
+    #[msg("Unauthorized behaviour during game")]
+    GameRunning,
 }
