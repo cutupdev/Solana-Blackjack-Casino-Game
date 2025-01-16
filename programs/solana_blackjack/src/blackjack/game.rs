@@ -1,5 +1,6 @@
 use anchor_lang::{ prelude::*, solana_program };
 use crate::blackjack::game_state::{ GameState, GameResult };
+// use crate::blackjack::treasury::*;
 use crate::utils::card::draw_card;
 use crate::utils::score::calculate_score;
 use crate::utils::error::ErrorCode;
@@ -7,9 +8,9 @@ use solana_program::{
     account_info::AccountInfo,
     pubkey::Pubkey,
     program::invoke,
-    program::invoke_signed,
+    // program::invoke_signed,
 };
-use std::ops::{ Mul, Div };
+
 
 pub fn initialize_game(ctx: Context<InitializeGame>, player: Pubkey) -> Result<()> {
     msg!("Greetings from: {:?}", ctx.program_id);
@@ -66,12 +67,12 @@ pub fn place_bet(ctx: Context<PlaceBet>, bet_amount: u64) -> Result<()> {
         // game.player_cards.push(first_card);
         let second_card = draw_card(&player_key.to_bytes(), &slot_bytes, game.draw_counter);
         game.draw_counter = game.draw_counter.wrapping_add(1);
-        // msg!("Player's second card is {}", second_card);
+        msg!("Player's second card is {}", second_card);
         game.player_cards.push(second_card);
 
         let dealer_card = draw_card(&player_key.to_bytes(), &slot_bytes, game.draw_counter);
         game.draw_counter = game.draw_counter.wrapping_add(1);
-        // msg!("Dealer drew {}", dealer_card);
+        msg!("Dealer drew {}", dealer_card);
         game.dealer_cards.push(dealer_card);
     }
 
@@ -109,233 +110,97 @@ pub fn hit(ctx: Context<Hit>) -> Result<()> {
     Ok(())
 }
 
+pub fn stand(ctx: Context<Stand>) -> Result<()> {
+    let game_account_info = ctx.accounts.game.to_account_info();
+    let game = &mut ctx.accounts.game;
 
-// pub fn stand(ctx: Context<Stand>) -> Result<()> {
-//     let game_account_info = ctx.accounts.game.to_account_info().clone();
-//     let _treasury_account_info = ctx.accounts.game.to_account_info();
-//     let game = &mut ctx.accounts.game;
+    //Find a way to correctly get treasury funds 
+    //And update correctly
 
-//     let bump = ctx.bumps.game;
-//     let _treasury_bump = ctx.bumps.treasury;
+    // let game_bump = ctx.bumps.game;
+    // let treasury_bump = ctx.bumps.treasury;
 
-//     if game.bet == 0 {
-//         return Err(ErrorCode::NoBetPlaced.into());
-//     }
-//     if game.result.is_some() {
-//         return Err(ErrorCode::GameAlreadyEnded.into());
-//     }
+    if game.bet == 0 {
+        return Err(ErrorCode::NoBetPlaced.into());
+    }
+    if game.result.is_some() {
+        return Err(ErrorCode::GameAlreadyEnded.into());
+    }
 
-//     let player_key = ctx.accounts.player.key().to_bytes();
-//     let blockhash = Clock::get()?.slot.to_le_bytes();
+    let player_key = ctx.accounts.player.key().to_bytes();
+    let blockhash = Clock::get()?.slot.to_le_bytes();
 
-//     let player_score = calculate_score(&game.player_cards);
+    let player_score = calculate_score(&game.player_cards);
 
-//     if player_score > 21 {
-//         //player bust
-//         game.result = Some(GameResult::DealerWin);
-//     } else {
-//         while calculate_score(&game.dealer_cards) < 17 {
-//             let dealer_card = draw_card(&player_key, &blockhash, game.draw_counter);
-//             game.draw_counter = game.draw_counter.wrapping_add(1);
-//             game.dealer_cards.push(dealer_card);
-//             msg!("Dealer drew {}", dealer_card);
-//         }
-
-//         let dealer_score = calculate_score(&game.dealer_cards);
-//         if player_score == 21 && dealer_score != 21 {
-//             game.result = Some(GameResult::PlayerBlackjack);
-//         } else if dealer_score > 21 || player_score > dealer_score {
-//             game.result = Some(GameResult::PlayerWin);
-//         } else if player_score < dealer_score {
-//             game.result = Some(GameResult::DealerWin);
-//         } else {
-//             game.result = Some(GameResult::Push);
-//         }
-//     }
-
-//     match game.result {
-//         Some(GameResult::PlayerWin) => {
-//             msg!("Player win");
-//             invoke_signed(
-//                 &solana_program::system_instruction::transfer(
-//                     game_account_info.to_account_info().key,
-//                     &ctx.accounts.player.to_account_info().key,
-//                     game.bet.mul(2)
-//                 ),
-//                 &[game_account_info.to_account_info(), ctx.accounts.player.to_account_info()],
-//                 &[&[b"game_pda", ctx.accounts.player.key().as_ref(), &[bump]]]
-//             )?;
-//         }
-//         Some(GameResult::PlayerBlackjack) => {
-//             msg!("Player Blackjack");
-//             invoke_signed(
-//                 &solana_program::system_instruction::transfer(
-//                     game_account_info.to_account_info().key,
-//                     &ctx.accounts.player.to_account_info().key,
-//                     game.bet.mul(3).div(2) //1.5x payout
-//                 ),
-//                 &[game_account_info.to_account_info(), ctx.accounts.player.to_account_info()],
-//                 &[&[b"game_pda", ctx.accounts.player.key().as_ref(), &[bump]]] // PDA signing
-//             )?;
-//         }
-//         Some(GameResult::Push) => {
-//             msg!("Push");
-//             invoke_signed(
-//                 &solana_program::system_instruction::transfer(
-//                     game_account_info.to_account_info().key,
-//                     ctx.accounts.player.to_account_info().key,
-//                     game.bet // Return bet
-//                 ),
-//                 &[game_account_info.to_account_info(), ctx.accounts.player.to_account_info()],
-//                 &[&[b"game_pda", ctx.accounts.player.key().as_ref(), &[bump]]]
-//             )?;
-//         }
-//         //Implement a way to make those funds not withdrawable by the user, to avoid him just withdrawing what he lost
-//         Some(GameResult::DealerWin) => {
-//             msg!("Dealer win");
-//             //Do Nothing
-//         }
-//         Some(GameResult::PlayerBust) => {
-//             msg!("Player bust");
-//             //Do nothing
-//         }
-//         None => {
-//             msg!("None pattern");
-//         }
-//     }
-
-    pub fn stand(ctx: Context<Stand>) -> Result<()> {
-        let game_account_info = ctx.accounts.game.to_account_info();
-        let game = &mut ctx.accounts.game;
-        
-        let treasury = &mut ctx.accounts.treasury;
-
-    
-        let game_bump = ctx.bumps.game;
-        let treasury_bump = ctx.bumps.treasury;
-    
-        if game.bet == 0 {
-            return Err(ErrorCode::NoBetPlaced.into());
+    if player_score > 21 {
+        // Player busts
+        game.result = Some(GameResult::DealerWin);
+        msg!("Player score is {}", player_score);
+    } else {
+        // Dealer draws cards until score >= 17
+        while calculate_score(&game.dealer_cards) < 17 {
+            let dealer_card = draw_card(&player_key, &blockhash, game.draw_counter);
+            game.draw_counter = game.draw_counter.wrapping_add(1);
+            game.dealer_cards.push(dealer_card);
+            msg!("Dealer drew {}", dealer_card);
         }
-        if game.result.is_some() {
-            return Err(ErrorCode::GameAlreadyEnded.into());
-        }
-    
-        let player_key = ctx.accounts.player.key().to_bytes();
-        let blockhash = Clock::get()?.slot.to_le_bytes();
-    
-        let player_score = calculate_score(&game.player_cards);
-    
-        if player_score > 21 {
-            // Player busts
+
+        let dealer_score = calculate_score(&game.dealer_cards);
+
+        // Determine the outcome
+        if player_score == 21 && dealer_score != 21 {
+            game.result = Some(GameResult::PlayerBlackjack);
+        } else if dealer_score > 21 || player_score > dealer_score {
+            game.result = Some(GameResult::PlayerWin);
+        } else if player_score < dealer_score {
             game.result = Some(GameResult::DealerWin);
         } else {
-            // Dealer draws cards until score >= 17
-            while calculate_score(&game.dealer_cards) < 17 {
-                let dealer_card = draw_card(&player_key, &blockhash, game.draw_counter);
-                game.draw_counter = game.draw_counter.wrapping_add(1);
-                game.dealer_cards.push(dealer_card);
-                msg!("Dealer drew {}", dealer_card);
-            }
-    
-            let dealer_score = calculate_score(&game.dealer_cards);
-    
-            // Determine the outcome
-            if player_score == 21 && dealer_score != 21 {
-                game.result = Some(GameResult::PlayerBlackjack);
-            } else if dealer_score > 21 || player_score > dealer_score {
-                game.result = Some(GameResult::PlayerWin);
-            } else if player_score < dealer_score {
-                game.result = Some(GameResult::DealerWin);
-            } else {
-                game.result = Some(GameResult::Push);
-            }
+            game.result = Some(GameResult::Push);
         }
-    
-        // Handle payouts based on the result
-        match game.result {
-            Some(GameResult::PlayerWin) => {
-                msg!("Player win");
-                // Transfer from treasury to game PDA for payout
-                invoke_signed(
-                    &solana_program::system_instruction::transfer(
-                        ctx.accounts.treasury.to_account_info().key,
-                        game_account_info.key,
-                        game.bet.mul(2),
-                    ),
-                    &[
-                        ctx.accounts.treasury.to_account_info(),
-                        game_account_info.to_account_info(),
-                    ],
-                    &[&[crate::TREASURY_SEED, &[treasury_bump]]],
-                )?;
-            }
-            Some(GameResult::PlayerBlackjack) => {
-                msg!("Player Blackjack");
-                // Transfer 1.5x payout from treasury to game PDA
-                invoke_signed(
-                    &solana_program::system_instruction::transfer(
-                        ctx.accounts.treasury.to_account_info().key,
-                        game_account_info.key,
-                        game.bet.mul(3).div(2),
-                    ),
-                    &[
-                        ctx.accounts.treasury.to_account_info(),
-                        game_account_info.to_account_info(),
-                    ],
-                    &[&[crate::TREASURY_SEED, &[treasury_bump]]],
-                )?;
-            }
-            Some(GameResult::Push) => {
-                msg!("Push");
-                // Refund bet from game PDA to player
-                invoke_signed(
-                    &solana_program::system_instruction::transfer(
-                        game_account_info.to_account_info().key,
-                        ctx.accounts.player.to_account_info().key,
-                        game.bet,
-                    ),
-                    &[
-                        game_account_info.to_account_info(),
-                        ctx.accounts.player.to_account_info(),
-                    ],
-                    &[&[b"game_pda", ctx.accounts.player.key().as_ref(), &[game_bump]]],
-                )?;
-            }
-            Some(GameResult::DealerWin) | Some(GameResult::PlayerBust) => {
-                msg!("Dealer win or Player bust");
-                // Transfer bet from game PDA to treasury
-                invoke_signed(
-                    &solana_program::system_instruction::transfer(
-                        game_account_info.to_account_info().key,
-                        ctx.accounts.treasury.to_account_info().key,
-                        game.bet,
-                    ),
-                    &[
-                        game_account_info.to_account_info(),
-                        ctx.accounts.treasury.to_account_info(),
-                    ],
-                    &[&[b"game_pda", ctx.accounts.player.key().as_ref(), &[game_bump]]],
-                )?;
-            }
-            None => {
-                msg!("None pattern");
-            }
-        }
-    
-        // Reset game state
-        msg!("Resetting game logic");
-        game.player_cards.clear();
-        game.dealer_cards.clear();
-        game.bet = 0;
-        game.result = None;
-    
-        game.log_game_state();
-    
-        Ok(())
-    }
-    
 
+        msg!("Player score: {} and dealer score: {}", player_score, dealer_score);
+    }
+
+
+    match game.result {
+        Some(GameResult::PlayerWin) => {
+            msg!("Player win");
+            let payout = game.bet;
+            // .checked_mul(2).ok_or(ErrorCode::Overflow)?;
+            **ctx.accounts.treasury.to_account_info().try_borrow_mut_lamports()? -= payout;
+            **game_account_info.try_borrow_mut_lamports()? += payout;
+        }
+        Some(GameResult::PlayerBlackjack) => {
+            msg!("Player Blackjack");
+            let payout = game.bet.checked_div(2).ok_or(ErrorCode::Overflow)?;
+            **ctx.accounts.treasury.to_account_info().try_borrow_mut_lamports()? -= payout;
+            **game_account_info.try_borrow_mut_lamports()? += payout;
+        }
+        Some(GameResult::Push) => {
+            msg!("Push");
+            // No lamport transfer for a push
+        }
+        Some(GameResult::DealerWin) | Some(GameResult::PlayerBust) => {
+            msg!("Dealer win or Player bust");
+            **game_account_info.try_borrow_mut_lamports()? -= game.bet;
+            **ctx.accounts.treasury.to_account_info().try_borrow_mut_lamports()? += game.bet;
+        }
+        None => {
+            msg!("None pattern");
+        }
+    }
+
+    // Reset game state
+    msg!("Resetting game logic");
+    game.player_cards.clear();
+    game.dealer_cards.clear();
+    game.bet = 0;
+    game.result = None;
+
+    game.log_game_state();
+
+    Ok(())
+}
 
 #[derive(Accounts)]
 pub struct InitializeGame<'info> {

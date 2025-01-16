@@ -1,7 +1,6 @@
 use anchor_lang::prelude::*;
 use crate::blackjack::game;
 use crate::blackjack::game::*;
-use crate::blackjack::player;
 use crate::blackjack::player::*;
 use crate::blackjack::treasury;
 use crate::blackjack::treasury::*;
@@ -14,10 +13,12 @@ declare_id!("CapEG2CccYXmkf3n4MDA77UfcyMKYVwfNHb5k9DtuyNt");
 /*
 TODO
 
-fix payouts
+fix payouts -> Ensure a way for the balance to be correctly updated, warning if treasury funds arent
+sufficient for bet amount
 add oracle for true randomness
 add eight decks
 better compute units calculation
+Tamper proof your program
 Make sure a player can't switch accounts to mess around the program logic
 */
 

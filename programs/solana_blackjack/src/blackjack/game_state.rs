@@ -46,7 +46,8 @@ impl GameState {
                             _ => c.to_string(),
                         })
                         .collect();
-                    msg!("- Player Cards: {}", card_names.join(", "));
+                    msg!("- Player Cards: {}, Number of cards is {}", card_names.join(", "), card_names.len());
+
                 }
         
                 if self.dealer_cards.is_empty() {
@@ -68,6 +69,7 @@ impl GameState {
         
                 msg!("- Bet: {} lamports", self.bet);
                 msg!("- Draw Counter: {}", self.draw_counter);
+                
                 match self.result {
                     None => msg!("- Result: None"),
                     Some(GameResult::PlayerWin) => msg!("- Result: PlayerWin"),

@@ -19,5 +19,7 @@ pub enum ErrorCode {
     #[msg("Insufficient funds in treasury.")]
     InsufficientTreasuryFunds,
     #[msg("Treasury already initialized")]
-    TreasuryAlreadyInitialized
+    TreasuryAlreadyInitialized,
+    #[msg("Account borrow error, Treasury struct cast failed")]
+    AccountBorrowError
 }
