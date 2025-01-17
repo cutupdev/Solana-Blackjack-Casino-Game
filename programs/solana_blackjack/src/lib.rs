@@ -8,18 +8,14 @@ use crate::blackjack::treasury::*;
 pub mod utils;
 pub mod blackjack;
 
-declare_id!("CapEG2CccYXmkf3n4MDA77UfcyMKYVwfNHb5k9DtuyNt");
-
+declare_id!("7LstZ1Mn48VJDjUvzWvZW5XssULqdYsP6wyU1ACGeD4E");
+//Actual id is 7LstZ1Mn48VJDjUvzWvZW5XssULqdYsP6wyU1ACGeD4E
 /*
 TODO
-
-fix payouts -> Ensure a way for the balance to be correctly updated, warning if treasury funds arent
-sufficient for bet amount
-add oracle for true randomness
-add eight decks
+fix withdraw_funds
+fix hit such that it automatically ends the game
 better compute units calculation
 Tamper proof your program
-Make sure a player can't switch accounts to mess around the program logic
 */
 
 pub const ADMIN_KEY: Pubkey = Pubkey::new_from_array([

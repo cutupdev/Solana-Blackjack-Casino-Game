@@ -1,8 +1,7 @@
 
 use anchor_lang::prelude::*;
-
-
-
+use crate::utils::card::{card_to_value, initialize_deck};
+use crate::utils::score::calculate_score;
 
 #[account]
 pub struct GameState {
@@ -12,7 +11,9 @@ pub struct GameState {
     pub bet: u64,
     pub result: Option<GameResult>,
     pub draw_counter: u8,
+    pub deck: [(u8,u8); 13],
 }
+
 
 impl GameState {
     pub const INITIAL_CARD_CAPACITY: usize = 10;
@@ -25,7 +26,11 @@ impl GameState {
         Self::INITIAL_CARD_CAPACITY + //vec<u8> (dealer_cards)
         8 + //u64
         1 + //Option<GameResult>
-        1; //Draw Counter
+        1 + 
+        13 * 2
+        ; //Draw counter
+        //What length should I add here for deck ? ; 
+
 
 
         pub fn log_game_state(&self) {
@@ -38,15 +43,9 @@ impl GameState {
                     let card_names: Vec<String> = self
                         .player_cards
                         .iter()
-                        .map(|&c| match c {
-                            1 => "Ace".to_string(),
-                            11 => "Jack".to_string(),
-                            12 => "Queen".to_string(),
-                            13 => "King".to_string(),
-                            _ => c.to_string(),
-                        })
+                        .map(|&c| card_to_value(c))
                         .collect();
-                    msg!("- Player Cards: {}, Number of cards is {}", card_names.join(", "), card_names.len());
+                    msg!("- Player Cards: {}, Number of cards is {}, score is {}", card_names.join(", "), card_names.len(), calculate_score(&self.player_cards));
 
                 }
         
@@ -56,13 +55,7 @@ impl GameState {
                     let card_names: Vec<String> = self
                         .dealer_cards
                         .iter()
-                        .map(|&c| match c {
-                            1 => "Ace".to_string(),
-                            11 => "Jack".to_string(),
-                            12 => "Queen".to_string(),
-                            13 => "King".to_string(),
-                            _ => c.to_string(),
-                        })
+                        .map(|&c| card_to_value(c))
                         .collect();
                     msg!("- Dealer Cards: {}", card_names.join(", "));
                 }
@@ -79,7 +72,15 @@ impl GameState {
                     Some(GameResult::Push) => msg!("- Result: Push"),
                 }
             }
-        
+            
+        pub fn reset_game(&mut self) {
+            //this doesnt reset the draw counter,
+            self.player_cards.clear();
+            self.dealer_cards.clear();
+            self.bet = 0;
+            self.result = None;
+            self.deck = initialize_deck();
+        }
 }
 
 

@@ -1,15 +1,14 @@
 use anchor_lang::{ prelude::*, solana_program };
 use crate::blackjack::game_state::{ GameState, GameResult };
-// use crate::blackjack::treasury::*;
-use crate::utils::card::draw_card;
+use crate::utils::card::{draw_from_deck, initialize_deck};
 use crate::utils::score::calculate_score;
 use crate::utils::error::ErrorCode;
 use solana_program::{
     account_info::AccountInfo,
     pubkey::Pubkey,
     program::invoke,
-    // program::invoke_signed,
 };
+
 
 
 pub fn initialize_game(ctx: Context<InitializeGame>, player: Pubkey) -> Result<()> {
@@ -26,11 +25,10 @@ pub fn initialize_game(ctx: Context<InitializeGame>, player: Pubkey) -> Result<(
     game.player = player;
     game.player_cards = Vec::with_capacity(GameState::INITIAL_CARD_CAPACITY);
     game.dealer_cards = Vec::with_capacity(GameState::INITIAL_CARD_CAPACITY);
-    // game.player_cards = Vec::new();
-    // game.dealer_cards = Vec::new();
     game.bet = 0;
     game.result = None;
     game.draw_counter = 0;
+    game.deck = initialize_deck();
 
     game.log_game_state();
 
@@ -41,6 +39,17 @@ pub fn place_bet(ctx: Context<PlaceBet>, bet_amount: u64) -> Result<()> {
     let game_key = &ctx.accounts.game.key();
     let player_key = &ctx.accounts.player.key();
     let game_result = &ctx.accounts.game.result;
+
+    let treasury_balance = **ctx.accounts.treasury.to_account_info().lamports.borrow();
+    if treasury_balance < bet_amount  {
+        return Err(ErrorCode::InsufficientTreasuryFunds.into());
+    }
+
+    // Check if the player has enough funds to place the bet
+    let player_balance = **ctx.accounts.player.to_account_info().lamports.borrow();
+    if player_balance < bet_amount {
+        return Err(ErrorCode::InsufficientPlayerFunds.into());
+    }
 
     if game_result.is_some() {
         return Err(ErrorCode::GameRunning.into());
@@ -61,16 +70,16 @@ pub fn place_bet(ctx: Context<PlaceBet>, bet_amount: u64) -> Result<()> {
         let clock = Clock::get().unwrap();
         let slot_bytes = clock.slot.to_le_bytes();
 
-        let first_card = draw_card(&player_key.to_bytes(), &slot_bytes, game.draw_counter);
+        let first_card = draw_from_deck(&player_key.to_bytes(), &slot_bytes, game.draw_counter, &mut game.deck);
         game.draw_counter = game.draw_counter.wrapping_add(1);
         msg!("Player's first card is {}", first_card);
         // game.player_cards.push(first_card);
-        let second_card = draw_card(&player_key.to_bytes(), &slot_bytes, game.draw_counter);
+        let second_card = draw_from_deck(&player_key.to_bytes(), &slot_bytes, game.draw_counter, &mut game.deck);
         game.draw_counter = game.draw_counter.wrapping_add(1);
         msg!("Player's second card is {}", second_card);
         game.player_cards.push(second_card);
 
-        let dealer_card = draw_card(&player_key.to_bytes(), &slot_bytes, game.draw_counter);
+        let dealer_card = draw_from_deck(&player_key.to_bytes(), &slot_bytes, game.draw_counter, &mut game.deck);
         game.draw_counter = game.draw_counter.wrapping_add(1);
         msg!("Dealer drew {}", dealer_card);
         game.dealer_cards.push(dealer_card);
@@ -95,7 +104,7 @@ pub fn hit(ctx: Context<Hit>) -> Result<()> {
     let clock = Clock::get().unwrap();
     let slot_bytes = clock.slot.to_le_bytes();
 
-    let card = draw_card(&player_key, &slot_bytes, game.draw_counter);
+    let card = draw_from_deck(&player_key, &slot_bytes, game.draw_counter, &mut game.deck);
     game.draw_counter = game.draw_counter.wrapping_add(1);
     msg!("Draw counter {}", game.draw_counter);
     msg!("Player drew {}", card);
@@ -114,7 +123,7 @@ pub fn stand(ctx: Context<Stand>) -> Result<()> {
     let game_account_info = ctx.accounts.game.to_account_info();
     let game = &mut ctx.accounts.game;
 
-    //Find a way to correctly get treasury funds 
+    //Find a way to correctly get treasury funds
     //And update correctly
 
     // let game_bump = ctx.bumps.game;
@@ -139,7 +148,7 @@ pub fn stand(ctx: Context<Stand>) -> Result<()> {
     } else {
         // Dealer draws cards until score >= 17
         while calculate_score(&game.dealer_cards) < 17 {
-            let dealer_card = draw_card(&player_key, &blockhash, game.draw_counter);
+            let dealer_card = draw_from_deck(&player_key, &blockhash, game.draw_counter, &mut game.deck);
             game.draw_counter = game.draw_counter.wrapping_add(1);
             game.dealer_cards.push(dealer_card);
             msg!("Dealer drew {}", dealer_card);
@@ -160,7 +169,6 @@ pub fn stand(ctx: Context<Stand>) -> Result<()> {
 
         msg!("Player score: {} and dealer score: {}", player_score, dealer_score);
     }
-
 
     match game.result {
         Some(GameResult::PlayerWin) => {
@@ -192,13 +200,7 @@ pub fn stand(ctx: Context<Stand>) -> Result<()> {
 
     // Reset game state
     msg!("Resetting game logic");
-    game.player_cards.clear();
-    game.dealer_cards.clear();
-    game.bet = 0;
-    game.result = None;
-
-    game.log_game_state();
-
+    game.reset_game();
     Ok(())
 }
 
@@ -223,6 +225,9 @@ pub struct PlaceBet<'info> {
     pub game: Account<'info, GameState>,
     #[account(mut)]
     pub player: Signer<'info>,
+    /// CHECK: This is safe because the treasury PDA is verified using the `seeds` attribute.
+    #[account(mut, seeds = [crate::TREASURY_SEED], bump)]
+    pub treasury: UncheckedAccount<'info>,
     pub system_program: Program<'info, System>,
 }
 

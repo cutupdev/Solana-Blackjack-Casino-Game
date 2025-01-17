@@ -5,10 +5,10 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-solana_blackjack = "CapEG2CccYXmkf3n4MDA77UfcyMKYVwfNHb5k9DtuyNt"
+solana_blackjack = "7LstZ1Mn48VJDjUvzWvZW5XssULqdYsP6wyU1ACGeD4E"
 
 [programs.devnet]
-solana_blackjack = "CapEG2CccYXmkf3n4MDA77UfcyMKYVwfNHb5k9DtuyNt"
+solana_blackjack = "7LstZ1Mn48VJDjUvzWvZW5XssULqdYsP6wyU1ACGeD4E"
 
 [registry]
 url = "https://api.apr.dev"

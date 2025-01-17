@@ -21,5 +21,7 @@ pub enum ErrorCode {
     #[msg("Treasury already initialized")]
     TreasuryAlreadyInitialized,
     #[msg("Account borrow error, Treasury struct cast failed")]
-    AccountBorrowError
+    AccountBorrowError,
+    #[msg("Player has insufficient funds for this action")]
+    InsufficientPlayerFunds,
 }
