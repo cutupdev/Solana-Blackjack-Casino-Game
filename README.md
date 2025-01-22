@@ -1,6 +1,3 @@
-Here’s a well-structured and relevant `README.md` for your Anchor project. Tailor it further to fit specific details about your project.
-
----
 
 # Solana Blackjack Game
 
