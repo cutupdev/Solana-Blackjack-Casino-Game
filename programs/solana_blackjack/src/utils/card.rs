@@ -50,13 +50,13 @@ pub fn draw_from_deck(
             }
         }
     }
-
+    
     // This should never be reached if the logic is correct
     panic!("Error in card drawing logic");
 }
 
 
-pub fn card_to_value(card: u8)->String {
+pub fn card_to_value(card: &u8)->String {
     match card {
         1 => "Ace".to_string(),
         11 => "Jack".to_string(),

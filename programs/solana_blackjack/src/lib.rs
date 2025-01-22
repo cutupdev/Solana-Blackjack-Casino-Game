@@ -8,14 +8,12 @@ use crate::blackjack::treasury::*;
 pub mod utils;
 pub mod blackjack;
 
-declare_id!("7LstZ1Mn48VJDjUvzWvZW5XssULqdYsP6wyU1ACGeD4E");
-//Actual id is 7LstZ1Mn48VJDjUvzWvZW5XssULqdYsP6wyU1ACGeD4E
+declare_id!("9dpmwY9gDHNohq7SeHgegqhTKDJjaJ8JP8QP7pxbSdCr");
 /*
 TODO
-fix withdraw_funds
-fix hit such that it automatically ends the game
-better compute units calculation
-Tamper proof your program
+
+ - You can always optimize the code, but it's not necessary for this project (lower compute unit consumption)
+
 */
 
 pub const ADMIN_KEY: Pubkey = Pubkey::new_from_array([
@@ -35,15 +33,15 @@ pub mod solana_blackjack {
         game::initialize_game(ctx, player)
     }
 
-    pub fn place_bet(ctx: Context<PlaceBet>, bet_amount: u64) -> Result<()> {
+    pub fn place_bet(ctx: Context<GameContext>, bet_amount: u64) -> Result<()> {
         game::place_bet(ctx, bet_amount)
     }
 
-    pub fn hit(ctx: Context<Hit>) -> Result<()> {
+    pub fn hit(ctx: Context<GameContext>) -> Result<()> {
         game::hit(ctx)
     }
 
-    pub fn stand(ctx: Context<Stand>) -> Result<()> {
+    pub fn stand(ctx: Context<GameContext>) -> Result<()> {
         game::stand(ctx)
     }
 
