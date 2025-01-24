@@ -51,9 +51,10 @@ pub fn place_bet(ctx: Context<GameContext>, bet_amount: u64) -> Result<()> {
         return Err(ErrorCode::InsufficientPlayerFunds.into());
     }
 
-    if game_result.is_some() {
+    if game_result.is_some() || ctx.accounts.game.bet != 0 {
         return Err(ErrorCode::GameRunning.into());
     }
+    
 
     invoke(
         &solana_program::system_instruction::transfer(&player_key, &game_key, bet_amount),

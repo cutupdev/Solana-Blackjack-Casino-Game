@@ -6,3 +6,4 @@ node_modules
 test-ledger
 .yarn
 .env
+new_program_keypair.json
