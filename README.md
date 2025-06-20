@@ -1,10 +1,59 @@
 
-# Solana Blackjack Game
+# Solana Chess Casino Game
 
-Welcome to **Solana Blackjack**, a decentralized blackjack game built on the **Solana blockchain** using **Anchor**. This project leverages Solana's high-performance blockchain for fast and secure transactions, providing users with an interactive and trustless blackjack gaming experience.
+This is chess game on the Solana blockchain. As a play-to-earn game, I have implemented smart contract for security. Solana program was built by Anchor framework and UI is built by react.js. This is not full code, I have shared only UI and smart contract here. For full working website, feel free to reach out of me when you need supports[Telegram: https://t.me/DevCutup, Whatspp: https://wa.me/13137423660].
 
-## How to play
-Click [here](https://nicobecodin.github.io/sol_blackjack_website/) to play online.
+
+
+## How to use it
+
+```bash
+git clone https://github.com/cutupdev/Solana-Chess-Casino-Game.git
+```
+
+```bash
+cd ./Solana-Chess-Casino-Game
+```
+
+```bash
+npm run install
+```
+
+- For smart contract deployment:
+```bash
+anchor build
+```
+
+```bash
+anchor deploy
+```
+
+- To start UI
+```bash
+cd ./frontend
+```
+
+```bash
+npm run install
+```
+
+```bash
+npm run dev
+```
+
+- To start Backend
+```bash
+cd ./backend
+```
+
+```bash
+npm run install
+```
+
+```bash
+npm run start
+```
+
 
 ## Features
 
@@ -32,16 +81,9 @@ Click [here](https://nicobecodin.github.io/sol_blackjack_website/) to play onlin
 
 ---
 
-## Technical Details
-
-- **Program Derived Addresses (PDAs)**: Used for securely managing player game states and the treasury.
-- **Deterministic Randomness**: Cards are drawn using a combination of blockhash, player keys, and counters.
-- **Security Features**:
-  - Treasury funds are only accessible to the program.
-  - Players can only manage their own game states.
-  - Only the admin account can reset the game.
 
 
-
-Feel free to reach out for questions or feedback! Happy gaming! 🎮✨
-
+### Contact Information
+- Telegram: https://t.me/DevCutup
+- Whatsapp: https://wa.me/13137423660
+- Twitter: https://x.com/devcutup
